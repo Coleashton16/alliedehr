@@ -1,0 +1,2000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusEHR - Comprehensive Clinical Flowsheet</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            overflow: hidden; 
+        }
+
+        .flowsheet-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: 100%;
+            background-color: #ffffff;
+        }
+        .flowsheet-table th, .flowsheet-table td {
+            border-right: 1px solid #d1d5db;
+            border-bottom: 1px solid #d1d5db;
+            padding: 0.4rem 0.5rem;
+            text-align: center;
+            min-width: 90px;
+            font-size: 0.875rem;
+        }
+        .flowsheet-table th {
+            background-color: #e5e7eb;
+            font-weight: 600;
+            color: #374151;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-top: 1px solid #d1d5db;
+        }
+        .flowsheet-table .row-header {
+            background-color: #f9fafb;
+            text-align: left;
+            font-weight: 500;
+            position: sticky;
+            left: 0;
+            z-index: 15;
+            min-width: 180px;
+            border-left: 1px solid #d1d5db;
+        }
+        .flowsheet-table th.row-header {
+            z-index: 20; 
+        }
+
+        .category-header {
+            background-color: #cbd5e1 !important;
+            color: #1e293b !important;
+            font-weight: bold !important;
+            text-transform: uppercase;
+            font-size: 0.75rem !important;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            position: sticky;
+            left: 0;
+            z-index: 16;
+        }
+        .category-header:hover {
+            background-color: #94a3b8 !important;
+        }
+
+        .row-indented {
+            padding-left: 1.5rem !important;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
+        }
+
+        @keyframes pulse-red {
+            0% { background-color: #fee2e2; color: #b91c1c; }
+            50% { background-color: #fef2f2; color: #dc2626; }
+            100% { background-color: #fee2e2; color: #b91c1c; }
+        }
+        .critical-value {
+            animation: pulse-red 2s infinite;
+            font-weight: bold;
+        }
+
+        .overlay-bg {
+            backdrop-filter: blur(4px);
+            background-color: rgba(0, 0, 0, 0.6);
+        }
+        
+        /* Utility to hide rows when category is collapsed */
+        .collapsed-row {
+            display: none;
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-95 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
+        <div class="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md border-t-4 border-blue-600">
+            <div class="text-center mb-8">
+                <i class="fa-solid fa-staff-snake text-blue-600 text-4xl mb-2"></i>
+                <h1 class="text-2xl font-bold tracking-tight text-slate-800">Nexus<span class="text-blue-600">EHR</span></h1>
+                <p class="text-slate-500 text-sm mt-1">Authorized Personnel Only</p>
+            </div>
+            
+            <form id="login-form" class="space-y-4">
+                <div id="login-error" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded border border-red-200 text-center"></div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Email Address</label>
+                    <input type="email" id="login-email" required class="w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                    <input type="password" id="login-pass" required class="w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded shadow transition mt-2">
+                    Secure Login
+                </button>
+            </form>
+            <p class="text-xs text-center text-gray-400 mt-6">Contact IT Support for access issues. No self-registration permitted.</p>
+        </div>
+    </div>
+
+    <div id="app-container" class="hidden flex flex-col h-screen w-screen">
+        
+        <header class="bg-slate-900 text-white flex items-center justify-between px-4 py-2 shadow-md shrink-0">
+            <div class="flex items-center space-x-4">
+                <i class="fa-solid fa-staff-snake text-blue-400 text-2xl"></i>
+                <h1 class="text-xl font-bold tracking-tight hidden sm:block">Nexus<span class="text-blue-400">EHR</span></h1>
+                <div class="h-6 w-px bg-slate-700 mx-2 hidden sm:block"></div>
+                
+                <button onclick="openPatientSearch()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm font-medium transition flex items-center shadow-sm border border-slate-600">
+                    <i class="fa-solid fa-magnifying-glass mr-2 text-blue-300"></i> Patient Lookup
+                </button>
+                <button onclick="openAddPatientModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-sm font-medium transition flex items-center shadow-sm border border-blue-500">
+                    <i class="fa-solid fa-user-plus mr-2"></i> Register Patient
+                </button>
+                <button onclick="openRuleManager()" class="bg-amber-500 hover:bg-amber-400 text-slate-900 px-3 py-1.5 rounded text-sm font-bold transition flex items-center shadow-sm border border-amber-400 ml-2">
+                    <i class="fa-solid fa-bell mr-2"></i> Alert Rules
+                </button>
+            </div>
+            <div class="flex items-center space-x-4 text-sm">
+                <div class="flex items-center space-x-2 hidden sm:flex">
+                    <i class="fa-solid fa-user-doctor text-gray-300"></i>
+                    <span id="current-user-display" class="truncate max-w-[150px]">Loading...</span>
+                </div>
+                <button onclick="handleLogout()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded transition border border-slate-600">Log Out</button>
+            </div>
+        </header>
+
+        <main class="flex-1 flex flex-col bg-gray-100 overflow-hidden relative w-full">
+            
+            <div id="patient-banner" class="bg-white border-b border-gray-300 p-4 shadow-sm shrink-0 hidden z-10">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center space-y-3 md:space-y-0">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800 flex items-center flex-wrap gap-2">
+                            <span id="banner-name"></span>
+                            <span class="text-sm font-normal bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full" id="banner-mrn"></span>
+                        </h2>
+                        <div class="text-sm text-slate-600 mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                            <span><i class="fa-solid fa-cake-candles text-gray-400 mr-1"></i> <span id="banner-dob"></span></span>
+                            <span><i class="fa-solid fa-mars-and-venus text-gray-400 mr-1"></i> <span id="banner-sex"></span></span>
+                            <span><i class="fa-solid fa-bed text-gray-400 mr-1"></i> <span id="banner-location"></span></span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <div class="bg-red-50 border border-red-200 text-red-700 px-3 py-1.5 rounded shadow-sm flex flex-col justify-center min-w-[120px]">
+                            <span class="text-[10px] font-bold uppercase text-red-500 leading-none mb-1">Allergies</span>
+                            <span class="text-sm font-semibold leading-none truncate max-w-[150px]" id="banner-allergies" title=""></span>
+                        </div>
+                        <div class="bg-purple-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded shadow-sm flex flex-col justify-center min-w-[120px]">
+                            <span class="text-[10px] font-bold uppercase text-purple-500 leading-none mb-1">Code Status</span>
+                            <span class="text-sm font-semibold leading-none" id="banner-code"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="flowsheet-workspace" class="flex-1 flex flex-col hidden overflow-hidden">
+                <div class="bg-gray-50 border-b border-gray-300 px-4 pt-3 flex space-x-2 shrink-0 items-end justify-between relative">
+                    <!-- Tabs -->
+                    <div class="flex space-x-1" style="margin-bottom: -1px;">
+                        <button onclick="switchTab('flowsheet')" id="tab-flowsheet" class="bg-white border-t border-l border-r border-gray-300 text-blue-600 px-4 py-2 rounded-t text-sm font-bold z-10 shadow-[0_-2px_4px_rgba(0,0,0,0.02)]">
+                            <i class="fa-solid fa-table-cells mr-2"></i> Flowsheet
+                        </button>
+                        <button onclick="switchTab('labs')" id="tab-labs" class="bg-gray-100 border-t border-l border-r border-gray-300 hover:bg-white text-gray-600 px-4 py-2 rounded-t text-sm font-medium transition shadow-inner">
+                            <i class="fa-solid fa-flask-vial mr-2"></i> Labs
+                        </button>
+                        <button onclick="switchTab('charting')" id="tab-charting" class="bg-gray-100 border-t border-l border-r border-gray-300 hover:bg-white text-gray-600 px-4 py-2 rounded-t text-sm font-medium transition shadow-inner">
+                            <i class="fa-solid fa-chart-line mr-2"></i> Graphing
+                        </button>
+                    </div>
+                    
+                    <!-- Flowsheet Actions -->
+                    <div id="actions-flowsheet" class="flex items-center space-x-4 pb-2">
+                        <button onclick="toggleAllCategories()" class="text-xs text-blue-600 hover:text-blue-800 underline">
+                            Expand/Collapse All
+                        </button>
+                        <button onclick="openFlowsheetForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm font-medium shadow flex items-center transition">
+                            <i class="fa-solid fa-plus-circle mr-2"></i> Add Vitals
+                        </button>
+                    </div>
+
+                    <!-- Labs Actions -->
+                    <div id="actions-labs" class="flex items-center space-x-4 pb-2 hidden">
+                        <button onclick="openLabForm()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded text-sm font-medium shadow flex items-center transition">
+                            <i class="fa-solid fa-plus-circle mr-2"></i> Enter Lab Results
+                        </button>
+                    </div>
+
+                    <!-- Charting Actions -->
+                    <div id="actions-charting" class="flex items-center space-x-4 pb-2 hidden">
+                        <select id="chart-parameter" onchange="renderChart()" class="border border-gray-300 rounded px-3 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                        </select>
+                        <button onclick="renderChart()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded text-sm font-medium shadow flex items-center transition">
+                            <i class="fa-solid fa-rotate-right mr-2"></i> Refresh Graph
+                        </button>
+                    </div>
+                </div>
+
+                <!-- View: Flowsheet -->
+                <div id="view-flowsheet" class="flex-1 overflow-auto bg-gray-200 p-4">
+                    <div class="bg-white shadow border border-gray-300 rounded overflow-hidden">
+                        <table class="flowsheet-table" id="flowsheet-table">
+                            <thead id="flowsheet-head"></thead>
+                            <tbody id="flowsheet-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- View: Labs -->
+                <div id="view-labs" class="flex-1 overflow-auto bg-gray-200 p-4 hidden">
+                    <div class="bg-white shadow border border-gray-300 rounded overflow-hidden">
+                        <table class="flowsheet-table" id="labs-table">
+                            <thead id="labs-head"></thead>
+                            <tbody id="labs-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- View: Charting -->
+                <div id="view-charting" class="flex-1 overflow-auto bg-gray-200 p-4 hidden flex-col">
+                    <div class="bg-white shadow border border-gray-300 rounded p-6 flex-1 flex flex-col">
+                        <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center"><i class="fa-solid fa-chart-line mr-2 text-emerald-600"></i> <span id="chart-title">Data Graph</span></h3>
+                        <div class="relative flex-1 w-full min-h-[400px]">
+                            <canvas id="dataChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-gray-400">
+                <i class="fa-solid fa-notes-medical text-6xl mb-4"></i>
+                <h3 class="text-xl font-medium text-gray-500">No Patient Chart Open</h3>
+                <p class="text-sm mt-2 text-center max-w-md">Use the <span class="font-bold text-slate-500"><i class="fa-solid fa-magnifying-glass text-xs"></i> Patient Lookup</span> button in the top navigation to search the directory.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Patient Search Modal -->
+    <div id="search-overlay" class="fixed inset-0 z-50 hidden flex flex-col items-center justify-center p-4 overlay-bg">
+        <div class="bg-white rounded shadow-2xl border border-gray-300 w-full max-w-5xl flex flex-col max-h-[90vh]">
+            <div class="bg-slate-800 text-white p-4 flex justify-between items-center shrink-0 rounded-t">
+                <h2 class="text-lg font-bold"><i class="fa-solid fa-users-viewfinder mr-2"></i> Patient Directory Lookup</h2>
+                <button onclick="closePatientSearch()" class="text-gray-300 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-4 bg-gray-50 border-b border-gray-200 shrink-0">
+                <form id="patient-search-form" onsubmit="handlePatientSearch(event)" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                    <div class="md:col-span-1">
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">MRN</label>
+                        <input type="text" id="search-mrn" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Name</label>
+                        <input type="text" id="search-name" placeholder="Last or First" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="md:col-span-1">
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">DOB</label>
+                        <input type="date" id="search-dob" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="md:col-span-1">
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Phone</label>
+                        <input type="text" id="search-phone" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="md:col-span-5 flex justify-end space-x-2 mt-2">
+                        <button type="button" onclick="clearSearchForm()" class="bg-white border border-gray-300 text-gray-700 px-4 py-1.5 rounded text-sm hover:bg-gray-100 transition">Clear</button>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-1.5 rounded text-sm font-medium shadow transition flex items-center">
+                            <i class="fa-solid fa-magnifying-glass mr-2"></i> Search
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="flex-1 overflow-auto bg-white p-0">
+                <table class="w-full text-left text-sm" id="search-results-table">
+                    <thead class="bg-gray-100 border-b border-gray-200 sticky top-0 shadow-sm">
+                        <tr>
+                            <th class="p-3 font-semibold text-gray-700">Name</th>
+                            <th class="p-3 font-semibold text-gray-700">MRN</th>
+                            <th class="p-3 font-semibold text-gray-700">DOB</th>
+                            <th class="p-3 font-semibold text-gray-700">Sex</th>
+                            <th class="p-3 font-semibold text-gray-700">Location</th>
+                            <th class="p-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="search-results-body" class="divide-y divide-gray-100">
+                        <tr>
+                            <td colspan="6" class="p-8 text-center text-gray-400">
+                                Click Search to view all patients or enter criteria to filter.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Patient Modal -->
+    <div id="add-patient-overlay" class="fixed inset-0 z-50 hidden flex flex-col items-center justify-center p-4 overlay-bg">
+        <div class="bg-white rounded shadow-2xl border border-gray-300 w-full max-w-2xl flex flex-col">
+            <div class="bg-blue-700 text-white p-4 flex justify-between items-center shrink-0 rounded-t">
+                <h2 class="text-lg font-bold"><i class="fa-solid fa-user-plus mr-2"></i> Register New Patient</h2>
+                <button onclick="closeAddPatientModal()" class="text-blue-200 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <form id="add-patient-form" onsubmit="submitNewPatient(event)" class="p-6 grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">First Name</label>
+                    <input type="text" id="add-fname" required class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Last Name</label>
+                    <input type="text" id="add-lname" required class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">DOB</label>
+                    <input type="date" id="add-dob" required class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Sex</label>
+                    <select id="add-sex" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        <option value="M">Male</option>
+                        <option value="F">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">MRN (Optional)</label>
+                    <input type="text" id="add-mrn" placeholder="Leave blank to auto-generate" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Phone</label>
+                    <input type="text" id="add-phone" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="col-span-2 border-t border-gray-200 pt-4 mt-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Location / Bed</label>
+                        <input type="text" id="add-loc" placeholder="e.g., MICU-01" required class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Allergies</label>
+                        <input type="text" id="add-allergies" placeholder="e.g., NKDA, Penicillin" required class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Code Status</label>
+                        <select id="add-code" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                            <option value="Full Code">Full Code</option>
+                            <option value="DNR/DNI">DNR/DNI</option>
+                            <option value="DNR">DNR (Intubate OK)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-span-2 flex justify-end space-x-3 mt-4">
+                    <button type="button" onclick="closeAddPatientModal()" class="bg-gray-100 border border-gray-300 text-gray-700 px-6 py-2 rounded font-medium hover:bg-gray-200 transition">Cancel</button>
+                    <button type="submit" id="add-patient-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded font-medium shadow transition">Register</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Comprehensive Flowsheet Data Entry Modal -->
+    <div id="add-flowsheet-panel" class="fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl border-l border-gray-300 transform translate-x-full transition-transform duration-300 ease-in-out z-40 flex flex-col">
+        <div class="bg-blue-600 text-white p-4 flex justify-between items-center shrink-0 shadow-sm z-10">
+            <h3 class="font-bold text-lg"><i class="fa-solid fa-file-medical mr-2"></i>Flowsheet Data Entry</h3>
+            <button onclick="closeFlowsheetForm()" class="text-white hover:text-gray-200 transition">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        
+        <div class="p-4 bg-gray-100 border-b border-gray-300 shrink-0">
+            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Time of Documentation</label>
+            <input type="time" id="fs-time" required form="fs-dynamic-form" class="w-full max-w-[200px] border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm">
+        </div>
+
+        <form id="fs-dynamic-form" class="flex-1 overflow-y-auto p-4 bg-gray-50" onsubmit="submitFlowsheet(event)">
+            <div id="dynamic-form-content" class="space-y-3 pb-8">
+                <!-- Dynamically generated sections go here -->
+            </div>
+        </form>
+        
+        <div class="p-4 border-t border-gray-300 bg-white shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <button type="submit" form="fs-dynamic-form" id="submit-fs-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded shadow transition flex items-center justify-center text-lg">
+                <i class="fa-solid fa-cloud-arrow-up mr-2"></i> File Data to Chart
+            </button>
+        </div>
+    </div>
+
+    <!-- Lab Results Data Entry Modal -->
+    <div id="add-lab-panel" class="fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl border-l border-gray-300 transform translate-x-full transition-transform duration-300 ease-in-out z-40 flex flex-col">
+        <div class="bg-purple-700 text-white p-4 flex justify-between items-center shrink-0 shadow-sm z-10">
+            <h3 class="font-bold text-lg"><i class="fa-solid fa-flask-vial mr-2"></i>Enter Lab Results</h3>
+            <button onclick="closeLabForm()" class="text-white hover:text-gray-200 transition">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        
+        <div class="p-4 bg-gray-100 border-b border-gray-300 shrink-0 grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Collection Date</label>
+                <input type="date" id="lab-date" required form="lab-dynamic-form" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 shadow-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Collection Time</label>
+                <input type="time" id="lab-time" required form="lab-dynamic-form" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 shadow-sm">
+            </div>
+        </div>
+
+        <form id="lab-dynamic-form" class="flex-1 overflow-y-auto p-4 bg-gray-50" onsubmit="submitLab(event)">
+            <div id="lab-form-content" class="space-y-3 pb-8">
+                <!-- Dynamically generated lab sections go here -->
+            </div>
+        </form>
+        
+        <div class="p-4 border-t border-gray-300 bg-white shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <button type="submit" form="lab-dynamic-form" id="submit-lab-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded shadow transition flex items-center justify-center text-lg">
+                <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Save Results to Chart
+            </button>
+        </div>
+    </div>
+
+    <!-- Clinical Advisory Alert Modal -->
+    <div id="alert-overlay" class="fixed inset-0 z-50 hidden flex items-center justify-center overlay-bg">
+        <div class="bg-white rounded shadow-2xl border-t-8 border-red-700 w-full max-w-md overflow-hidden">
+            <div class="bg-red-700 text-white p-4 flex items-center space-x-3">
+                <i class="fa-solid fa-triangle-exclamation text-3xl"></i>
+                <div>
+                    <h2 class="text-xl font-bold uppercase tracking-wide">Clinical Advisory</h2>
+                    <p class="text-red-200 text-sm font-medium">Immediate Action Required</p>
+                </div>
+            </div>
+            
+            <div class="p-6 bg-slate-50">
+                <div class="bg-white border border-red-200 border-l-4 border-l-red-600 p-4 shadow-sm mb-6">
+                    <p id="alert-message" class="text-red-900 font-bold text-lg leading-tight"></p>
+                    <p class="text-slate-600 text-sm mt-3 border-t border-slate-100 pt-2">Protocol mandates provider acknowledgment of this advisory.</p>
+                </div>
+
+                <form id="ack-form" onsubmit="handleAcknowledgment(event)">
+                    <div class="space-y-4">
+                        <p class="text-xs font-bold text-gray-500 uppercase">Authentication Required</p>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                            <input type="text" id="ack-user" required class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-red-500 focus:border-red-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <input type="password" id="ack-pass" required class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-red-500 focus:border-red-500">
+                        </div>
+                        <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded shadow-lg transition mt-4 flex items-center justify-center">
+                            <i class="fa-solid fa-check-double mr-2"></i> Acknowledge Alert
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Rule Manager Modal -->
+    <div id="rule-manager-overlay" class="fixed inset-0 z-50 hidden flex flex-col items-center justify-center p-4 overlay-bg">
+        <div class="bg-white rounded shadow-2xl border border-gray-300 w-full max-w-4xl flex flex-col max-h-[90vh]">
+            <div class="bg-amber-500 text-slate-900 p-4 flex justify-between items-center shrink-0 rounded-t">
+                <h2 class="text-lg font-bold"><i class="fa-solid fa-bell-concierge mr-2"></i> Custom Clinical Advisory Rules</h2>
+                <button onclick="closeRuleManager()" class="text-amber-900 hover:text-slate-900 transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-5 bg-gray-50 border-b border-gray-200 shrink-0">
+                <h3 class="text-sm font-bold text-gray-700 mb-3">Create New Rule</h3>
+                <form id="add-rule-form" onsubmit="submitNewRule(event)" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Parameter</label>
+                        <select id="rule-param" required class="w-full border border-gray-300 rounded px-2 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"></select>
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Condition</label>
+                        <select id="rule-op" required class="w-full border border-gray-300 rounded px-2 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
+                            <option value=">">Greater than (>)</option>
+                            <option value="<">Less than (<)</option>
+                            <option value=">=">Greater or Eq (>=)</option>
+                            <option value="<=">Less or Eq (<=)</option>
+                            <option value="==">Equals (==)</option>
+                            <option value="trend_up">Trend Up By (>=)</option>
+                            <option value="trend_down">Trend Down By (>=)</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Value</label>
+                        <input type="text" id="rule-val" required placeholder="e.g. 130" class="w-full border border-gray-300 rounded px-2 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
+                    </div>
+                    <div class="md:col-span-12 mt-1">
+                        <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Alert Message</label>
+                        <div class="flex space-x-2">
+                            <input type="text" id="rule-msg" placeholder="e.g., Critical Tachycardia! Assess patient immediately." required class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
+                            <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-slate-900 px-6 py-2 rounded text-sm font-bold shadow transition whitespace-nowrap">
+                                <i class="fa-solid fa-plus mr-1"></i> Add Rule
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="flex-1 overflow-auto bg-white p-0">
+                <table class="w-full text-left text-sm" id="rules-table">
+                    <thead class="bg-slate-100 border-b border-gray-200 sticky top-0 shadow-sm">
+                        <tr>
+                            <th class="p-3 font-semibold text-gray-700">Parameter</th>
+                            <th class="p-3 font-semibold text-gray-700">Condition</th>
+                            <th class="p-3 font-semibold text-gray-700">Value</th>
+                            <th class="p-3 font-semibold text-gray-700">Alert Message</th>
+                            <th class="p-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rules-body" class="divide-y divide-gray-100">
+                        <tr>
+                            <td colspan="5" class="p-8 text-center text-gray-500">Loading custom rules...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, addDoc, getDocs, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAibENb43wXCoKJ0uQlBVXCK5hzMJuBb0E",
+            authDomain: "alliedehr-ff529.firebaseapp.com",
+            projectId: "alliedehr-ff529",
+            storageBucket: "alliedehr-ff529.firebasestorage.app",
+            messagingSenderId: "657801628253",
+            appId: "1:657801628253:web:5259754fb3d2b4e271dbb4"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const PLATFORM_APP_ID = "alliedehr-ff529";
+
+        // Global state
+        let currentPatientId = null;
+        let allPatients = [];
+        let currentFlowsheetData = [];
+        let flowsheetUnsubscribe = null;
+        let categoryToggleState = {}; // Tracks which categories are expanded in the table
+
+        let currentLabsData = [];
+        let labsUnsubscribe = null;
+        let labCategoryToggleState = {}; 
+
+        let customRules = [];
+        let rulesUnsubscribe = null;
+
+        // Epic-style comprehensive flowsheet configuration
+        const flowsheetConfig = [
+            {
+                category: 'Vital Signs',
+                id: 'cat-vitals',
+                icon: 'fa-heart-pulse',
+                items: [
+                    { key: 'hr', label: 'Heart Rate', unit: 'bpm', type: 'number', critical: (v) => v > 120 || v < 50 },
+                    { key: 'sbp', label: 'Systolic BP', unit: 'mmHg', type: 'number', critical: (v) => v < 90 || v > 180 },
+                    { key: 'dbp', label: 'Diastolic BP', unit: 'mmHg', type: 'number' },
+                    { key: 'map', label: 'MAP (Calc)', unit: 'mmHg', type: 'calculated', calc: (d) => (d.sbp && d.dbp) ? Math.round((parseInt(d.sbp) + 2 * parseInt(d.dbp)) / 3) : '' },
+                    { key: 'rr', label: 'Resp Rate', unit: 'br/min', type: 'number', critical: (v) => v > 24 || v < 10 },
+                    { key: 'spo2', label: 'SpO2', unit: '%', type: 'number', critical: (v) => v < 90 },
+                    { key: 'temp', label: 'Temp', unit: '°C', type: 'number', critical: (v) => v > 38.3 || v < 36.0 },
+                    { key: 'pain', label: 'Pain Score', unit: '0-10', type: 'number' }
+                ]
+            },
+            {
+                category: 'Respiratory',
+                id: 'cat-resp',
+                icon: 'fa-lungs',
+                items: [
+                    { key: 'o2_device', label: 'O2 Device', type: 'select', options: ['Room Air', 'Nasal Cannula', 'High Flow NC', 'BiPAP', 'CPAP', 'Ventilator', 'Trach Collar'] },
+                    { key: 'fio2', label: 'FiO2 / Flow', unit: '%/L', type: 'number' },
+                    { key: 'breath_sounds', label: 'Breath Sounds', type: 'select', options: ['Clear', 'Diminished', 'Wheezes', 'Crackles/Rales', 'Rhonchi', 'Absent'] },
+                    { key: 'resp_effort', label: 'Effort', type: 'select', options: ['Unlabored', 'Shallow', 'Labored', 'Accessory Use', 'Retractions'] }
+                ]
+            },
+            {
+                category: 'Neurological',
+                id: 'cat-neuro',
+                icon: 'fa-brain',
+                items: [
+                    { key: 'orientation', label: 'Orientation', type: 'select', options: ['A&O x4', 'A&O x3', 'A&O x2', 'A&O x1', 'Confused', 'Unresponsive'] },
+                    { key: 'gcs', label: 'GCS Total', unit: '3-15', type: 'number', critical: (v) => v <= 8 },
+                    { key: 'pupil_l', label: 'Pupil L', unit: 'mm', type: 'number' },
+                    { key: 'pupil_r', label: 'Pupil R', unit: 'mm', type: 'number' },
+                    { key: 'rass', label: 'RASS Score', type: 'number' }
+                ]
+            },
+            {
+                category: 'Cardiovascular',
+                id: 'cat-cardio',
+                icon: 'fa-wave-square',
+                items: [
+                    { key: 'rhythm', label: 'Rhythm', type: 'select', options: ['NSR', 'Sinus Tach', 'Sinus Brady', 'A-Fib', 'A-Flutter', 'Paced', 'Heart Block', 'Asystole'] },
+                    { key: 'cap_refill', label: 'Cap Refill', type: 'select', options: ['< 2 sec', '> 2 sec', 'Absent'] },
+                    { key: 'pulses', label: 'Periph Pulses', type: 'select', options: ['2+ Normal', '1+ Diminished', '3+ Bounding', '0 Absent/Doppler'] },
+                    { key: 'edema', label: 'Edema', type: 'select', options: ['None', '1+ Pitting', '2+ Pitting', '3+ Pitting', '4+ Pitting', 'Non-pitting'] }
+                ]
+            },
+            {
+                category: 'Gastrointestinal',
+                id: 'cat-gi',
+                icon: 'fa-utensils',
+                items: [
+                    { key: 'diet', label: 'Diet', type: 'select', options: ['NPO', 'Clear Liquids', 'Full Liquids', 'Soft', 'Regular', 'Tube Feed', 'TPN'] },
+                    { key: 'bowel_sounds', label: 'Bowel Sounds', type: 'select', options: ['Present x4', 'Hypoactive', 'Hyperactive', 'Absent'] },
+                    { key: 'abdomen', label: 'Abdomen', type: 'select', options: ['Soft/NT', 'Firm', 'Distended', 'Tender', 'Guarding', 'Rigid'] },
+                    { key: 'nausea', label: 'Nausea/Vomit', type: 'select', options: ['None', 'Nausea only', 'Emesis (Small)', 'Emesis (Large)'] }
+                ]
+            },
+            {
+                category: 'Intake & Output',
+                id: 'cat-io',
+                icon: 'fa-droplet',
+                items: [
+                    { key: 'in_po', label: 'PO Intake', unit: 'mL', type: 'number' },
+                    { key: 'in_iv', label: 'IV Fluids', unit: 'mL', type: 'number' },
+                    { key: 'out_urine', label: 'Urine Output', unit: 'mL', type: 'number' },
+                    { key: 'out_emesis', label: 'Emesis Out', unit: 'mL', type: 'number' },
+                    { key: 'out_stool', label: 'Stool/Ostomy', unit: 'mL', type: 'number' },
+                    { key: 'out_drains', label: 'Drains Out', unit: 'mL', type: 'number' }
+                ]
+            },
+            {
+                category: 'Skin & Wounds',
+                id: 'cat-skin',
+                icon: 'fa-bandage',
+                items: [
+                    { key: 'skin_int', label: 'Skin Integrity', type: 'select', options: ['Intact', 'Rash', 'Tear', 'Incision', 'Pressure Injury'] },
+                    { key: 'turn', label: 'Turn/Repos', type: 'select', options: ['Self', 'Assisted', 'Refused', 'Contraindicated'] },
+                    { key: 'braden', label: 'Braden Score', type: 'number' }
+                ]
+            },
+            {
+                category: 'Lines & Tubes',
+                id: 'cat-lines',
+                icon: 'fa-syringe',
+                items: [
+                    { key: 'piv_site', label: 'PIV Status', type: 'select', options: ['Patent/No Redness', 'Infiltrated', 'Phlebitis', 'Removed', 'None'] },
+                    { key: 'cvc_site', label: 'Central Line', type: 'select', options: ['Dsg Intact', 'Dsg Changed', 'Removed', 'None'] },
+                    { key: 'foley', label: 'Foley', type: 'select', options: ['Patent/Draining', 'Leaking', 'Removed', 'None'] },
+                    { key: 'scd', label: 'SCDs', type: 'select', options: ['On & Active', 'Refused', 'Off for Ambulation', 'None'] }
+                ]
+            }
+        ];
+
+        // Comprehensive Labs Configuration
+        const labsConfig = [
+            {
+                category: 'CBC (Complete Blood Count)',
+                id: 'lab-cbc',
+                icon: 'fa-vial',
+                items: [
+                    { key: 'wbc', label: 'WBC', unit: 'x10^3/uL', type: 'number', critical: (v) => v < 2.0 || v > 30.0 },
+                    { key: 'hgb', label: 'Hgb', unit: 'g/dL', type: 'number', critical: (v) => v < 7.0 },
+                    { key: 'hct', label: 'Hct', unit: '%', type: 'number' },
+                    { key: 'plt', label: 'Plt', unit: 'x10^3/uL', type: 'number', critical: (v) => v < 50 }
+                ]
+            },
+            {
+                category: 'CMP (Comprehensive Metabolic Panel)',
+                id: 'lab-cmp',
+                icon: 'fa-flask',
+                items: [
+                    { key: 'na', label: 'Sodium', unit: 'mmol/L', type: 'number', critical: (v) => v < 125 || v > 155 },
+                    { key: 'k', label: 'Potassium', unit: 'mmol/L', type: 'number', critical: (v) => v < 3.0 || v > 6.0 },
+                    { key: 'cl', label: 'Chloride', unit: 'mmol/L', type: 'number' },
+                    { key: 'co2', label: 'CO2', unit: 'mmol/L', type: 'number' },
+                    { key: 'bun', label: 'BUN', unit: 'mg/dL', type: 'number' },
+                    { key: 'cr', label: 'Creatinine', unit: 'mg/dL', type: 'number' },
+                    { key: 'gluc', label: 'Glucose', unit: 'mg/dL', type: 'number', critical: (v) => v < 60 || v > 400 },
+                    { key: 'ca', label: 'Calcium', unit: 'mg/dL', type: 'number' },
+                    { key: 'tp', label: 'Total Protein', unit: 'g/dL', type: 'number' },
+                    { key: 'alb', label: 'Albumin', unit: 'g/dL', type: 'number' },
+                    { key: 'ast', label: 'AST', unit: 'U/L', type: 'number' },
+                    { key: 'alt', label: 'ALT', unit: 'U/L', type: 'number' },
+                    { key: 'alp', label: 'Alk Phos', unit: 'U/L', type: 'number' },
+                    { key: 'bili', label: 'Total Bili', unit: 'mg/dL', type: 'number' }
+                ]
+            },
+            {
+                category: 'Thyroid Panel',
+                id: 'lab-thyroid',
+                icon: 'fa-shield-halved',
+                items: [
+                    { key: 'tsh', label: 'TSH', unit: 'mIU/L', type: 'number' },
+                    { key: 'ft4', label: 'Free T4', unit: 'ng/dL', type: 'number' },
+                    { key: 'ft3', label: 'Free T3', unit: 'pg/mL', type: 'number' }
+                ]
+            },
+            {
+                category: 'Ketones',
+                id: 'lab-ketone',
+                icon: 'fa-droplet',
+                items: [
+                    { key: 'ketone_source', label: 'Source', type: 'select', options: ['Urine', 'Blood'] },
+                    { key: 'ketone_result', label: 'Result', type: 'number' }
+                ]
+            }
+        ];
+
+        // Default all categories to expanded
+        flowsheetConfig.forEach(cat => categoryToggleState[cat.id] = true);
+        labsConfig.forEach(cat => labCategoryToggleState[cat.id] = true);
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('login-overlay').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden');
+                document.getElementById('current-user-display').textContent = user.email;
+                fetchPatients();
+                generateFlowsheetFormUI(); // Build the forms once on load
+                generateLabFormUI();
+                listenToRules();
+                populateRuleDropdown();
+                populateChartDropdown();
+            } else {
+                document.getElementById('login-overlay').classList.remove('hidden');
+                document.getElementById('app-container').classList.add('hidden');
+                currentPatientId = null;
+                allPatients = [];
+                currentFlowsheetData = [];
+                if (flowsheetUnsubscribe) {
+                    flowsheetUnsubscribe();
+                    flowsheetUnsubscribe = null;
+                }
+                currentLabsData = [];
+                if (labsUnsubscribe) {
+                    labsUnsubscribe();
+                    labsUnsubscribe = null;
+                }
+                customRules = [];
+                if (rulesUnsubscribe) {
+                    rulesUnsubscribe();
+                    rulesUnsubscribe = null;
+                }
+                document.getElementById('empty-state').classList.remove('hidden');
+                document.getElementById('patient-banner').classList.add('hidden');
+                document.getElementById('flowsheet-workspace').classList.add('hidden');
+            }
+        });
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-pass').value;
+            const errorDiv = document.getElementById('login-error');
+            const btn = e.target.querySelector('button');
+            
+            btn.textContent = "Authenticating...";
+            btn.disabled = true;
+            errorDiv.classList.add('hidden');
+
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.classList.remove('hidden');
+                btn.textContent = "Secure Login";
+                btn.disabled = false;
+            }
+        });
+
+        window.handleLogout = () => {
+            signOut(auth).catch(err => console.error("Logout Error:", err));
+        };
+
+        async function fetchPatients() {
+            if (!auth.currentUser) return;
+            try {
+                const patientsRef = collection(db, 'artifacts', PLATFORM_APP_ID, 'public', 'data', 'patients');
+                const snapshot = await getDocs(patientsRef);
+                allPatients = [];
+                snapshot.forEach(doc => {
+                    allPatients.push({ id: doc.id, ...doc.data() });
+                });
+                if (!document.getElementById('search-overlay').classList.contains('hidden')) {
+                    renderSearchResults(allPatients);
+                }
+            } catch (error) {
+                console.error("Error fetching patients:", error);
+            }
+        }
+
+        function listenToFlowsheet(patientId) {
+            if (!auth.currentUser) return;
+            if (flowsheetUnsubscribe) flowsheetUnsubscribe();
+
+            const flowsheetRef = collection(db, 'artifacts', PLATFORM_APP_ID, 'public', 'data', 'flowsheets');
+            
+            flowsheetUnsubscribe = onSnapshot(flowsheetRef, (snapshot) => {
+                currentFlowsheetData = [];
+                snapshot.forEach(doc => {
+                    const rawData = doc.data();
+                    if (rawData.patientId === patientId) {
+                        // Handle backwards compatibility for old flat structures
+                        let normalizedData = rawData.data || {};
+                        if (!rawData.data) {
+                            ['hr', 'sbp', 'dbp', 'rr', 'spo2', 'temp'].forEach(k => {
+                                if (rawData[k] !== undefined) normalizedData[k] = rawData[k];
+                            });
+                        }
+                        currentFlowsheetData.push({ 
+                            id: doc.id, 
+                            time: rawData.time, 
+                            recordedAt: rawData.recordedAt, 
+                            data: normalizedData 
+                        });
+                    }
+                });
+                renderFlowsheetTable();
+            }, (error) => {
+                console.error("Error listening to flowsheet:", error);
+            });
+        }
+
+        function listenToLabs(patientId) {
+            if (!auth.currentUser) return;
+            if (labsUnsubscribe) labsUnsubscribe();
+
+            const labsRef = collection(db, 'artifacts', PLATFORM_APP_ID, 'public', 'data', 'labs');
+            
+            labsUnsubscribe = onSnapshot(labsRef, (snapshot) => {
+                currentLabsData = [];
+                snapshot.forEach(doc => {
+                    const rawData = doc.data();
+                    if (rawData.patientId === patientId) {
+                        currentLabsData.push({ 
+                            id: doc.id, 
+                            date: rawData.date,
+                            time: rawData.time, 
+                            recordedAt: rawData.recordedAt, 
+                            data: rawData.data || {}
+                        });
+                    }
+                });
+                renderLabsTable();
+            }, (error) => {
+                console.error("Error listening to labs:", error);
+            });
+        }
+
+        function listenToRules() {
+            if (!auth.currentUser) return;
+            if (rulesUnsubscribe) rulesUnsubscribe();
+
+            const rulesRef = collection(db, 'artifacts', PLATFORM_APP_ID, 'public', 'data', 'rules');
+            
+            rulesUnsubscribe = onSnapshot(rulesRef, (snapshot) => {
+                customRules = [];
+                snapshot.forEach(doc => {
+                    customRules.push({ id: doc.id, ...doc.data() });
+                });
+                renderRulesTable();
+            }, (error) => {
+                console.error("Error listening to rules:", error);
+            });
+        }
+
+        window.openPatientSearch = () => {
+            document.getElementById('search-overlay').classList.remove('hidden');
+            if (document.getElementById('search-mrn').value === '' && document.getElementById('search-name').value === '') {
+                renderSearchResults(allPatients);
+            }
+        };
+
+        window.closePatientSearch = () => {
+            document.getElementById('search-overlay').classList.add('hidden');
+        };
+
+        window.clearSearchForm = () => {
+            document.getElementById('patient-search-form').reset();
+            renderSearchResults(allPatients); 
+        };
+
+        window.handlePatientSearch = (e) => {
+            e.preventDefault();
+            const mrn = document.getElementById('search-mrn').value.toLowerCase().trim();
+            const name = document.getElementById('search-name').value.toLowerCase().trim();
+            const dob = document.getElementById('search-dob').value; 
+            const phone = document.getElementById('search-phone').value.toLowerCase().trim();
+
+            const results = allPatients.filter(p => {
+                let match = true;
+                if (mrn) match = match && p.mrn.toLowerCase().includes(mrn);
+                if (name) match = match && (p.firstName.toLowerCase().includes(name) || p.lastName.toLowerCase().includes(name));
+                if (dob) match = match && p.dob === dob;
+                if (phone) match = match && p.phone.replace(/\D/g,'').includes(phone.replace(/\D/g,''));
+                return match;
+            });
+
+            renderSearchResults(results);
+        };
+
+        function renderSearchResults(results) {
+            const tbody = document.getElementById('search-results-body');
+            tbody.innerHTML = ''; 
+            if (results.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-500 font-medium">No patients found. Click 'Register Patient' to add a new one.</td></tr>`;
+                return;
+            }
+            results.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-blue-50 transition border-b border-gray-100";
+                const locBadgeClass = p.location.includes('ICU') ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+                tr.innerHTML = `
+                    <td class="p-3 font-semibold text-blue-600">${p.lastName}, ${p.firstName}</td>
+                    <td class="p-3 font-mono text-xs text-gray-600">${p.mrn}</td>
+                    <td class="p-3">${p.dob}</td>
+                    <td class="p-3">${p.sex}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-xs font-medium ${locBadgeClass}">${p.location}</span></td>
+                    <td class="p-3 text-right">
+                        <button onclick="selectPatient('${p.id}')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium shadow-sm transition">Open Chart</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        window.openAddPatientModal = () => document.getElementById('add-patient-overlay').classList.remove('hidden');
+        window.closeAddPatientModal = () => {
+            document.getElementById('add-patient-overlay').classList.add('hidden');
+            document.getElementById('add-patient-form').reset();
+        };
+
+        window.submitNewPatient = async (e) => {
+            e.preventDefault();
+            if (!auth.currentUser) return;
+            const btn = document.getElementById('add-patient-btn');
+            btn.textContent = "Saving...";
+            btn.disabled = true;
+
+            let mrn = document.getElementById('add-mrn').value.trim();
+            if (!mrn) mrn = 'MRN-' + Math.floor(Math.random() * 90000 + 10000) + String.fromCharCode(65 + Math.floor(Math.random() * 26));
+
+            const newPatient = {
+                firstName: document.getElementById('add-fname').value.trim(),
+                lastName: document.getElementById('add-lname').value.trim(),
+                dob: document.getElementById('add-dob').value,
+                sex: document.getElementById('add-sex').value,
+                mrn: mrn,
+                phone: document.getElementById('add-phone').value.trim(),
+                location: document.getElementById('add-loc').value.trim(),
+                allergies: document.getElementById('add-allergies').value.trim(),
+                codeStatus: document.getElementById('add-code').value,
+                createdAt: new Date().toISOString(),
+                createdBy: auth.currentUser.email
+            };
+
+            try {
+                const patientsRef = collection(db, 'artifacts', PLATFORM_APP_ID, 'public', 'data', 'patients');
+                await addDoc(patientsRef, newPatient);
+                closeAddPatientModal();
+                await fetchPatients(); 
+                openPatientSearch();
+                document.getElementById('search-mrn').value = mrn;
+                document.getElementById('patient-search-form').dispatchEvent(new Event('submit'));
+            } catch (error) {
+                console.error("Error adding patient:", error);
+            } finally {
+                btn.textContent = "Register";
+                btn.disabled = false;
+            }
+        };
+
+        window.selectPatient = (id) => {
+            currentPatientId = id;
+            closePatientSearch();
+            const patient = allPatients.find(p => p.id === id);
+            if (!patient) return;
+            
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('patient-banner').classList.remove('hidden');
+            document.getElementById('flowsheet-workspace').classList.remove('hidden');
+            
+            document.getElementById('banner-name').textContent = `${patient.lastName}, ${patient.firstName}`;
+            document.getElementById('banner-mrn').textContent = `MRN: ${patient.mrn}`;
+            document.getElementById('banner-dob').textContent = patient.dob;
+            document.getElementById('banner-sex').textContent = patient.sex;
+            document.getElementById('banner-location').textContent = patient.location;
+            
+            const alg = document.getElementById('banner-allergies');
+            alg.textContent = patient.allergies;
+            alg.title = patient.allergies; // Tooltip for long strings
+            
+            document.getElementById('banner-code').textContent = patient.codeStatus;
+
+            // Reset to Flowsheet tab view when opening new chart
+            switchTab('flowsheet');
+
+            listenToFlowsheet(id);
+            listenToLabs(id);
+        };
+
+        window.switchTab = (tabId) => {
+            const tabs = ['flowsheet', 'labs', 'charting'];
+            
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                const view = document.getElementById(`view-${t}`);
+                const action = document.getElementById(`actions-${t}`);
+                
+                if (!btn || !view || !action) return;
+
+                if (t === tabId) {
+                    let textClass = t === 'flowsheet' ? 'text-blue-600' : (t === 'labs' ? 'text-purple-600' : 'text-emerald-600');
+                    btn.className = `bg-white border-t border-l border-r border-gray-300 px-4 py-2 rounded-t text-sm font-bold z-10 shadow-[0_-2px_4px_rgba(0,0,0,0.02)] ${textClass}`;
+                    btn.querySelector('i').className = `fa-solid ${t === 'flowsheet' ? 'fa-table-cells' : (t === 'labs' ? 'fa-flask-vial' : 'fa-chart-line')} mr-2`;
+                    
+                    view.classList.remove('hidden');
+                    action.classList.remove('hidden');
+                    if(t === 'charting') view.classList.add('flex');
+                } else {
+                    btn.className = `bg-gray-100 border-t border-l border-r border-gray-300 hover:bg-white text-gray-600 px-4 py-2 rounded-t text-sm font-medium transition shadow-inner`;
+                    btn.querySelector('i').className = `fa-solid ${t === 'flowsheet' ? 'fa-table-cells' : (t === 'labs' ? 'fa-flask-vial' : 'fa-chart-line')} text-gray-600 mr-2`;
+                    
+                    view.classList.add('hidden');
+                    action.classList.add('hidden');
+                    if(t === 'charting') view.classList.remove('flex');
+                }
+            });
+            
+            if (tabId === 'charting') renderChart();
+        };
+
+        window.toggleCategory = (catId) => {
+            categoryToggleState[catId] = !categoryToggleState[catId];
+            renderFlowsheetTable(); // Re-render to apply classes
+        };
+
+        window.toggleAllCategories = () => {
+            const anyClosed = flowsheetConfig.some(cat => !categoryToggleState[cat.id]);
+            flowsheetConfig.forEach(cat => categoryToggleState[cat.id] = anyClosed);
+            renderFlowsheetTable();
+        };
+
+        function renderFlowsheetTable() {
+            if (!currentPatientId) return;
+
+            // Sort entries chronologically
+            const entries = [...currentFlowsheetData].sort((a, b) => a.time.localeCompare(b.time));
+
+            const thead = document.getElementById('flowsheet-head');
+            const tbody = document.getElementById('flowsheet-body');
+            
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            // Render Header Row (Times)
+            const trHead = document.createElement('tr');
+            const thCorner = document.createElement('th');
+            thCorner.className = 'row-header bg-slate-200 border-b-2 border-slate-400';
+            thCorner.textContent = 'Parameter \\ Time';
+            trHead.appendChild(thCorner);
+
+            entries.forEach(entry => {
+                const th = document.createElement('th');
+                th.className = 'bg-slate-200 border-b-2 border-slate-400 min-w-[100px]';
+                th.textContent = entry.time;
+                trHead.appendChild(th);
+            });
+            thead.appendChild(trHead);
+
+            // Render Categories and Data Rows
+            flowsheetConfig.forEach((category) => {
+                const isExpanded = categoryToggleState[category.id];
+
+                // Category Header Row
+                const catRow = document.createElement('tr');
+                const catTh = document.createElement('th');
+                catTh.className = 'category-header text-left';
+                catTh.colSpan = entries.length + 1;
+                catTh.innerHTML = `<div class="flex items-center space-x-2">
+                    <i class="fa-solid ${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'} w-4 text-center"></i>
+                    <i class="fa-solid ${category.icon} text-slate-500 w-4 text-center"></i>
+                    <span>${category.category}</span>
+                </div>`;
+                catTh.onclick = () => toggleCategory(category.id);
+                catRow.appendChild(catTh);
+                tbody.appendChild(catRow);
+
+                // Item Rows
+                category.items.forEach((item) => {
+                    const tr = document.createElement('tr');
+                    if (!isExpanded) tr.className = 'collapsed-row';
+                    
+                    const th = document.createElement('th');
+                    th.className = 'row-header row-indented';
+                    th.innerHTML = `<div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-700">${item.label}</span>
+                        ${item.unit ? `<span class="text-slate-400 ml-1 whitespace-nowrap">${item.unit}</span>` : ''}
+                    </div>`;
+                    tr.appendChild(th);
+
+                    entries.forEach(entry => {
+                        const td = document.createElement('td');
+                        let valDisplay = '';
+                        let isCrit = false;
+                        
+                        const val = entry.data[item.key];
+
+                        if (item.type === 'calculated') {
+                            valDisplay = item.calc(entry.data);
+                        } else if (val !== undefined && val !== null && val !== '') {
+                            valDisplay = val;
+                            if (item.critical) isCrit = item.critical(val);
+                        }
+
+                        if (isCrit) {
+                            td.className = 'critical-value';
+                            valDisplay = `<i class="fa-solid fa-arrow-up text-red-600 mr-1 text-xs"></i> ${valDisplay}`;
+                        } else if (valDisplay === '') {
+                            td.className = 'text-gray-300';
+                            valDisplay = '-';
+                        }
+                        
+                        td.innerHTML = valDisplay;
+                        tr.appendChild(td);
+                    });
+                    
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+
+        function renderLabsTable() {
+            if (!currentPatientId) return;
+
+            // Sort entries chronologically by Date then Time
+            const entries = [...currentLabsData].sort((a, b) => {
+                const dateA = new Date(a.date + 'T' + a.time);
+                const dateB = new Date(b.date + 'T' + b.time);
+                return dateA - dateB;
+            });
+
+            const thead = document.getElementById('labs-head');
+            const tbody = document.getElementById('labs-body');
+            
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            const trHead = document.createElement('tr');
+            const thCorner = document.createElement('th');
+            thCorner.className = 'row-header bg-slate-200 border-b-2 border-slate-400';
+            thCorner.textContent = 'Lab Test \\ Result Time';
+            trHead.appendChild(thCorner);
+
+            entries.forEach(entry => {
+                const th = document.createElement('th');
+                th.className = 'bg-slate-200 border-b-2 border-slate-400 min-w-[100px] text-xs font-medium';
+                // Show Date on top line, Time on bottom line
+                const shortDate = entry.date.split('-').slice(1).join('/'); // MM/DD
+                th.innerHTML = `${shortDate}<br/>${entry.time}`;
+                trHead.appendChild(th);
+            });
+            thead.appendChild(trHead);
+
+            labsConfig.forEach((category) => {
+                const isExpanded = labCategoryToggleState[category.id];
+
+                const catRow = document.createElement('tr');
+                const catTh = document.createElement('th');
+                catTh.className = 'category-header text-left';
+                catTh.colSpan = entries.length + 1;
+                // Tint lab categories slightly purple
+                catTh.style.backgroundColor = '#d8b4e2'; 
+                catTh.innerHTML = `<div class="flex items-center space-x-2">
+                    <i class="fa-solid ${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'} w-4 text-center"></i>
+                    <i class="fa-solid ${category.icon} text-slate-600 w-4 text-center"></i>
+                    <span>${category.category}</span>
+                </div>`;
+                catTh.onclick = () => {
+                    labCategoryToggleState[category.id] = !labCategoryToggleState[category.id];
+                    renderLabsTable();
+                };
+                catRow.appendChild(catTh);
+                tbody.appendChild(catRow);
+
+                category.items.forEach((item) => {
+                    const tr = document.createElement('tr');
+                    if (!isExpanded) tr.className = 'collapsed-row';
+                    
+                    const th = document.createElement('th');
+                    th.className = 'row-header row-indented';
+                    th.innerHTML = `<div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-700">${item.label}</span>
+                        ${item.unit ? `<span class="text-slate-400 ml-1 whitespace-nowrap">${item.unit}</span>` : ''}
+                    </div>`;
+                    tr.appendChild(th);
+
+                    entries.forEach(entry => {
+                        const td = document.createElement('td');
+                        let valDisplay = '';
+                        let isCrit = false;
+                        
+                        const val = entry.data[item.key];
+
+                        if (val !== undefined && val !== null && val !== '') {
+                            valDisplay = val;
+                            if (item.critical) isCrit = item.critical(val);
+                        }
+
+                        if (isCrit) {
+                            td.className = 'critical-value text-xs';
+                            valDisplay = `<i class="fa-solid fa-arrow-up text-red-600 mr-1"></i> ${valDisplay}`;
+                        } else if (valDisplay === '') {
+                            td.className = 'text-gray-300';
+                            valDisplay = '-';
+                        }
+                        
+                        td.innerHTML = valDisplay;
+                        tr.appendChild(td);
+                    });
+                    
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+
+        function generateFlowsheetFormUI() {
+            const container = document.getElementById('dynamic-form-content');
+            container.innerHTML = '';
+
+            flowsheetConfig.forEach((category, idx) => {
+                const section = document.createElement('div');
+                section.className = 'border border-gray-200 rounded mb-3 bg-white shadow-sm overflow-hidden';
+                
+                const header = document.createElement('button');
+                header.className = 'w-full text-left px-4 py-3 bg-slate-100 font-semibold text-slate-800 flex justify-between items-center hover:bg-slate-200 transition focus:outline-none';
+                header.type = 'button';
+                header.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fa-solid ${category.icon} text-blue-600 w-6 text-center mr-2"></i> 
+                        ${category.category}
+                    </div>
+                    <i class="fa-solid ${idx === 0 ? 'fa-chevron-up' : 'fa-chevron-down'} text-slate-400 transition-transform"></i>
+                `;
+                
+                const content = document.createElement('div');
+                content.className = idx === 0 ? 'p-4 grid grid-cols-1 md:grid-cols-2 gap-4' : 'p-4 grid grid-cols-1 md:grid-cols-2 gap-4 hidden'; 
+                
+                header.onclick = () => {
+                    content.classList.toggle('hidden');
+                    const icon = header.querySelector('.fa-chevron-down, .fa-chevron-up');
+                    icon.classList.toggle('fa-chevron-down');
+                    icon.classList.toggle('fa-chevron-up');
+                };
+                
+                category.items.forEach(item => {
+                    if (item.type === 'calculated') return; // Skip calculated in input form
+                    
+                    const wrapper = document.createElement('div');
+                    let inputHtml = '';
+                    
+                    if (item.type === 'number') {
+                        inputHtml = `<input type="number" id="fs-in-${item.key}" step="any" placeholder="${item.unit || ''}" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">`;
+                    } else if (item.type === 'select') {
+                        const options = item.options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+                        inputHtml = `<select id="fs-in-${item.key}" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            <option value="">-- Select --</option>
+                            ${options}
+                        </select>`;
+                    }
+                    
+                    wrapper.innerHTML = `
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1 truncate" title="${item.label}">
+                            ${item.label} ${item.unit ? `<span class="text-slate-400 font-normal normal-case">(${item.unit})</span>` : ''}
+                        </label>
+                        ${inputHtml}
+                    `;
+                    content.appendChild(wrapper);
+                });
+                
+                section.appendChild(header);
+                section.appendChild(content);
+                container.appendChild(section);
+            });
+        }
+
+        function generateLabFormUI() {
+            const container = document.getElementById('lab-form-content');
+            container.innerHTML = '';
+
+            labsConfig.forEach((category, idx) => {
+                const section = document.createElement('div');
+                section.className = 'border border-gray-200 rounded mb-3 bg-white shadow-sm overflow-hidden';
+                
+                const header = document.createElement('button');
+                header.className = 'w-full text-left px-4 py-3 bg-purple-50 font-semibold text-purple-900 flex justify-between items-center hover:bg-purple-100 transition focus:outline-none';
+                header.type = 'button';
+                header.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fa-solid ${category.icon} text-purple-600 w-6 text-center mr-2"></i> 
+                        ${category.category}
+                    </div>
+                    <i class="fa-solid ${idx === 0 ? 'fa-chevron-up' : 'fa-chevron-down'} text-purple-400 transition-transform"></i>
+                `;
+                
+                const content = document.createElement('div');
+                content.className = idx === 0 ? 'p-4 grid grid-cols-1 md:grid-cols-2 gap-4' : 'p-4 grid grid-cols-1 md:grid-cols-2 gap-4 hidden'; 
+                
+                header.onclick = () => {
+                    content.classList.toggle('hidden');
+                    const icon = header.querySelector('.fa-chevron-down, .fa-chevron-up');
+                    icon.classList.toggle('fa-chevron-down');
+                    icon.classList.toggle('fa-chevron-up');
+                };
+                
+                category.items.forEach(item => {
+                    const wrapper = document.createElement('div');
+                    let inputHtml = '';
+                    
+                    if (item.type === 'number') {
+                        // Use type="text" so users can enter free-form data like ">1000", "<0.1", or "Pending"
+                        inputHtml = `<input type="text" id="lab-in-${item.key}" placeholder="${item.unit || 'Enter result...'}" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500">`;
+                    } else if (item.type === 'select') {
+                        const options = item.options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+                        inputHtml = `<select id="lab-in-${item.key}" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500">
+                            <option value="">-- Select --</option>
+                            ${options}
+                        </select>`;
+                    }
+                    
+                    wrapper.innerHTML = `
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1 truncate" title="${item.label}">
+                            ${item.label} ${item.unit ? `<span class="text-slate-400 font-normal normal-case">(${item.unit})</span>` : ''}
+                        </label>
+                        ${inputHtml}
+                    `;
+                    content.appendChild(wrapper);
+                });
+                
+                section.appendChild(header);
+                section.appendChild(content);
+                container.appendChild(section);
+            });
+        }
+
+        window.openFlowsheetForm = () => {
+            if (!currentPatientId) return;
+            const now = new Date();
+            const timeString = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('fs-time').value = timeString;
+            
+            // Clear previous inputs
+            document.getElementById('fs-dynamic-form').reset();
+
+            // Auto-expand first section, collapse others
+            const sections = document.getElementById('dynamic-form-content').children;
+            for(let i=0; i<sections.length; i++) {
+                const btn = sections[i].querySelector('button');
+                const content = sections[i].querySelector('div.grid');
+                const icon = btn.querySelector('.fa-chevron-down, .fa-chevron-up');
+                
+                if (i === 0) {
+                    content.classList.remove('hidden');
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                } else {
+                    content.classList.add('hidden');
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+            }
+
+            document.getElementById('add-flowsheet-panel').classList.remove('translate-x-full');
+        };
+
+        window.closeFlowsheetForm = () => {
+            document.getElementById('add-flowsheet-panel').classList.add('translate-x-full');
+        };
+
+        window.openLabForm = () => {
+            if (!currentPatientId) return;
+            const now = new Date();
+            
+            // Set default date and time to now
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            document.getElementById('lab-date').value = `${yyyy}-${mm}-${dd}`;
+            
+            const timeString = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('lab-time').value = timeString;
+            
+            // Clear previous inputs
+            document.getElementById('lab-dynamic-form').reset();
+
+            // Auto-expand first section, collapse others
+            const sections = document.getElementById('lab-form-content').children;
+            for(let i=0; i<sections.length; i++) {
+                const btn = sections[i].querySelector('button');
+                const content = sections[i].querySelector('div.grid');
+                const icon = btn.querySelector('.fa-chevron-down, .fa-chevron-up');
+                
+                if (i === 0) {
+                    content.classList.remove('hidden');
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                } else {
+                    content.classList.add('hidden');
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+            }
+
+            document.getElementById('add-lab-panel').classList.remove('translate-x-full');
+        };
+
+        window.closeLabForm = () => {
+            document.getElementById('add-lab-panel').classList.add('translate-x-full');
+        };
+
+        window.openRuleManager = () => {
+            document.getElementById('rule-manager-overlay').classList.remove('hidden');
+        };
+
+        window.closeRuleManager = () => {
+            document.getElementById('rule-manager-overlay').classList.add('hidden');
+            document.getElementById('add-rule-form').reset();
+        };
+
+        function populateRuleDropdown() {
+            const select = document.getElementById('rule-param');
+            select.innerHTML = '';
+            
+            const optgroupFS = document.createElement('optgroup');
+            optgroupFS.label = 'Flowsheet Items';
+            flowsheetConfig.forEach(cat => {
+                cat.items.forEach(item => {
+                    if (item.type !== 'select') {
+                        const opt = document.createElement('option');
+                        opt.value = item.key;
+                        opt.textContent = `${cat.category} - ${item.label}`;
+                        optgroupFS.appendChild(opt);
+                    }
+                });
+            });
+            select.appendChild(optgroupFS);
+
+            const optgroupLabs = document.createElement('optgroup');
+            optgroupLabs.label = 'Lab Results';
+            labsConfig.forEach(cat => {
+                cat.items.forEach(item => {
+                    if (item.type !== 'select') {
+                        const opt = document.createElement('option');
+                        opt.value = item.key;
+                        opt.textContent = `${cat.category} - ${item.label}`;
+                        optgroupLabs.appendChild(opt);
+                    }
+                });
+            });
+            select.appendChild(optgroupLabs);
+        }
+
+        window.submitNewRule = async (e) => {
+            e.preventDefault();
+            if (!auth.currentUser) return;
+
+            const paramSelect = document.getElementById('rule-param');
+            const newRule = {
+                parameter: paramSelect.value,
+                parameterLabel: paramSelect.options[paramSelect.selectedIndex].text,
+                operator: document.getElementById('rule-op').value,
+                value: document.getElementById('rule-val').value,
+                message: document.getElementById('rule-msg').value,
+                createdAt: new Date().toISOString(),
+                createdBy: auth.currentUser.email
+            };
+
+            try {
+                const rulesRef = collection(db, 'artifacts', PLATFORM_APP_ID, 'public', 'data', 'rules');
+                await addDoc(rulesRef, newRule);
+                document.getElementById('add-rule-form').reset();
+            } catch (error) {
+                console.error("Error adding custom rule:", error);
+            }
+        };
+
+        window.deleteRule = async (ruleId) => {
+            if (!auth.currentUser || !confirm("Are you sure you want to delete this rule?")) return;
+            try {
+                await deleteDoc(doc(db, 'artifacts', PLATFORM_APP_ID, 'public', 'data', 'rules', ruleId));
+            } catch (error) {
+                console.error("Error deleting rule:", error);
+            }
+        };
+
+        function renderRulesTable() {
+            const tbody = document.getElementById('rules-body');
+            tbody.innerHTML = '';
+            
+            if (customRules.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500 font-medium">No custom rules configured. Enter one above.</td></tr>`;
+                return;
+            }
+            
+            customRules.forEach(rule => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-amber-50 transition border-b border-gray-100";
+                tr.innerHTML = `
+                    <td class="p-3 font-semibold text-slate-700">${rule.parameterLabel}</td>
+                    <td class="p-3">
+                        <span class="bg-gray-200 text-gray-800 font-mono px-2 py-1 rounded text-xs">${rule.operator}</span>
+                    </td>
+                    <td class="p-3 font-bold text-amber-700">${rule.value}</td>
+                    <td class="p-3 text-sm text-gray-600">${rule.message}</td>
+                    <td class="p-3 text-right">
+                        <button onclick="deleteRule('${rule.id}')" class="text-red-500 hover:text-red-700 transition" title="Delete Rule">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        window.submitFlowsheet = async (e) => {
+            e.preventDefault();
+            if (!auth.currentUser || !currentPatientId) return;
+
+            const btn = document.getElementById('submit-fs-btn');
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Filing...`;
+            btn.disabled = true;
+
+            const entryData = {};
+            
+            // Gather data from dynamic form
+            flowsheetConfig.forEach(category => {
+                category.items.forEach(item => {
+                    if (item.type === 'calculated') return;
+                    const el = document.getElementById(`fs-in-${item.key}`);
+                    if (el && el.value !== '') {
+                        entryData[item.key] = item.type === 'number' ? parseFloat(el.value) : el.value;
+                    }
+                });
+            });
+
+            const newDoc = {
+                patientId: currentPatientId,
+                time: document.getElementById('fs-time').value,
+                data: entryData,
+                recordedAt: new Date().toISOString(),
+                recordedBy: auth.currentUser.email
+            };
+
+            try {
+                const flowsheetRef = collection(db, 'artifacts', PLATFORM_APP_ID, 'public', 'data', 'flowsheets');
+                await addDoc(flowsheetRef, newDoc);
+                closeFlowsheetForm();
+                
+                // Run CDS rules
+                const advisory = checkAdvisoryRules(entryData);
+                if (advisory.triggered) {
+                    triggerAlert(advisory.message);
+                }
+            } catch (error) {
+                console.error("Error filing flowsheet:", error);
+            } finally {
+                btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up mr-2"></i> File Data to Chart`;
+                btn.disabled = false;
+            }
+        };
+
+        window.submitLab = async (e) => {
+            e.preventDefault();
+            if (!auth.currentUser || !currentPatientId) return;
+
+            const btn = document.getElementById('submit-lab-btn');
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...`;
+            btn.disabled = true;
+
+            const entryData = {};
+            
+            // Gather data from dynamic lab form
+            // Notice we do NOT parsefloat here so text values like "<0.1" are preserved perfectly.
+            labsConfig.forEach(category => {
+                category.items.forEach(item => {
+                    const el = document.getElementById(`lab-in-${item.key}`);
+                    if (el && el.value !== '') {
+                        entryData[item.key] = el.value;
+                    }
+                });
+            });
+
+            // Prevent saving if no lab values were entered
+            if (Object.keys(entryData).length === 0) {
+                alert("Please enter at least one lab value.");
+                btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up mr-2"></i> Save Results to Chart`;
+                btn.disabled = false;
+                return;
+            }
+
+            const newDoc = {
+                patientId: currentPatientId,
+                date: document.getElementById('lab-date').value,
+                time: document.getElementById('lab-time').value,
+                data: entryData,
+                recordedAt: new Date().toISOString(),
+                recordedBy: auth.currentUser.email
+            };
+
+            try {
+                const labsRef = collection(db, 'artifacts', PLATFORM_APP_ID, 'public', 'data', 'labs');
+                await addDoc(labsRef, newDoc);
+                closeLabForm();
+
+                // Run CDS rules for labs as well
+                const advisory = checkAdvisoryRules(entryData);
+                if (advisory.triggered) {
+                    triggerAlert(advisory.message);
+                }
+            } catch (error) {
+                console.error("Error saving lab results:", error);
+            } finally {
+                btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up mr-2"></i> Save Results to Chart`;
+                btn.disabled = false;
+            }
+        };
+
+        let alertSynth = null;
+        let alertLoop = null;
+
+        function initAudio() {
+            if (!alertSynth) {
+                // Highly aggressive FM synth for a true hospital monitor sound
+                alertSynth = new Tone.PolySynth(Tone.FMSynth, {
+                    harmonicity: 3,
+                    modulationIndex: 10,
+                    oscillator: { type: "square" },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.1 },
+                    modulation: { type: "sine" },
+                    modulationEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.1 }
+                }).toDestination();
+                alertSynth.volume.value = -8; 
+            }
+        }
+
+        async function playAlertSequence() {
+            try {
+                await Tone.start();
+                initAudio();
+                const now = Tone.now();
+                // Standard IEC 60601-1-8 high priority alarm (5 rapid high-pitched bursts)
+                const pitch = "E6"; 
+                const pitchHigh = "C7";
+                const dur = "16n";
+                
+                alertSynth.triggerAttackRelease(pitchHigh, dur, now);
+                alertSynth.triggerAttackRelease(pitch, dur, now + 0.15);
+                alertSynth.triggerAttackRelease(pitchHigh, dur, now + 0.30);
+                
+                alertSynth.triggerAttackRelease(pitch, dur, now + 0.65);
+                alertSynth.triggerAttackRelease(pitchHigh, dur, now + 0.80);
+            } catch (err) {
+                console.warn("Audio context blocked by browser. Visual alert only.", err);
+            }
+        }
+
+        function startContinuousAlert() {
+            playAlertSequence();
+            alertLoop = setInterval(() => playAlertSequence(), 3000);
+        }
+
+        function stopContinuousAlert() {
+            if (alertLoop) {
+                clearInterval(alertLoop);
+                alertLoop = null;
+            }
+        }
+
+        // Helper function to find the most recent historical value for a parameter
+        function getPreviousValue(parameter) {
+            let allEntries = [];
+            currentFlowsheetData.forEach(d => {
+                if (d.data[parameter] !== undefined && d.data[parameter] !== '') {
+                    const match = String(d.data[parameter]).match(/-?\d+(\.\d+)?/);
+                    if (match) allEntries.push({ time: new Date(d.recordedAt).getTime(), val: parseFloat(match[0]) });
+                }
+            });
+            currentLabsData.forEach(d => {
+                if (d.data[parameter] !== undefined && d.data[parameter] !== '') {
+                    const match = String(d.data[parameter]).match(/-?\d+(\.\d+)?/);
+                    if (match) allEntries.push({ time: new Date(d.recordedAt).getTime(), val: parseFloat(match[0]) });
+                }
+            });
+            if (allEntries.length === 0) return null;
+            
+            // Sort descending by time
+            allEntries.sort((a, b) => b.time - a.time);
+            return allEntries[0].val;
+        }
+
+        function checkAdvisoryRules(data) {
+            // 1. Evaluate Custom User-Defined Rules First
+            for (const rule of customRules) {
+                const currentVal = data[rule.parameter];
+                if (currentVal !== undefined && currentVal !== null && currentVal !== '') {
+                    
+                    // Robust numeric extraction to handle inputs like "<0.1" or ">1000" in labs
+                    const numMatch = String(currentVal).match(/-?\d+(\.\d+)?/);
+                    const curNum = numMatch ? parseFloat(numMatch[0]) : NaN;
+                    const ruleNum = parseFloat(rule.value);
+                    
+                    if (!isNaN(curNum) && !isNaN(ruleNum)) {
+                        let triggered = false;
+                        switch(rule.operator) {
+                            case '>': triggered = curNum > ruleNum; break;
+                            case '<': triggered = curNum < ruleNum; break;
+                            case '>=': triggered = curNum >= ruleNum; break;
+                            case '<=': triggered = curNum <= ruleNum; break;
+                            case '==': triggered = curNum === ruleNum; break;
+                            case 'trend_up': {
+                                const prev = getPreviousValue(rule.parameter);
+                                if (prev !== null && !isNaN(prev)) {
+                                    triggered = (curNum - prev) >= ruleNum;
+                                }
+                                break;
+                            }
+                            case 'trend_down': {
+                                const prev = getPreviousValue(rule.parameter);
+                                if (prev !== null && !isNaN(prev)) {
+                                    triggered = (prev - curNum) >= ruleNum;
+                                }
+                                break;
+                            }
+                        }
+                        if (triggered) {
+                            return { triggered: true, message: `CUSTOM ADVISORY: ${rule.message} (Value recorded: ${currentVal})` };
+                        }
+                    } else if (rule.operator === '==') {
+                        // Fallback string matching for ==
+                        if (String(currentVal).toLowerCase() === String(rule.value).toLowerCase()) {
+                            return { triggered: true, message: `CUSTOM ADVISORY: ${rule.message} (Value recorded: ${currentVal})` };
+                        }
+                    }
+                }
+            }
+
+            // 2. Evaluate Hardcoded Default Rules (Safety Net)
+            if (data.spo2 && data.spo2 < 90) {
+                return { triggered: true, message: `CRITICAL HYPOXIA ALERT: SpO2 dropped to ${data.spo2}%. Supplemental oxygen pathway evaluation required.` };
+            }
+            if (data.sbp && data.sbp < 90) {
+                return { triggered: true, message: `SEVERE HYPOTENSION: Systolic BP is ${data.sbp} mmHg. Assess for perfusion deficit immediately.` };
+            }
+            if (data.gcs && data.gcs <= 8) {
+                return { triggered: true, message: `CRITICAL NEUROLOGICAL DECLINE: GCS is ${data.gcs} (<=8). Consider immediate intubation for airway protection.` };
+            }
+            
+            let sirsCount = 0;
+            if (data.temp && (data.temp > 38.3 || data.temp < 36.0)) sirsCount++;
+            if (data.hr && data.hr > 90) sirsCount++;
+            if (data.rr && data.rr > 20) sirsCount++;
+            
+            if (sirsCount >= 2) {
+                return { triggered: true, message: `SEPSIS ADVISORY (SIRS): Patient meets ${sirsCount} SIRS criteria. Immediate physician review required to rule out sepsis.` };
+            }
+            return { triggered: false };
+        }
+
+        function triggerAlert(message) {
+            const overlay = document.getElementById('alert-overlay');
+            const msgEl = document.getElementById('alert-message');
+            msgEl.textContent = message;
+            
+            document.getElementById('ack-user').value = '';
+            document.getElementById('ack-pass').value = '';
+            
+            overlay.classList.remove('hidden');
+            setTimeout(() => document.getElementById('ack-user').focus(), 100);
+
+            startContinuousAlert();
+        }
+
+        window.handleAcknowledgment = (e) => {
+            e.preventDefault(); 
+            const user = document.getElementById('ack-user').value;
+            const pass = document.getElementById('ack-pass').value;
+            
+            if (user.trim() !== '' && pass.trim() !== '') {
+                stopContinuousAlert();
+                document.getElementById('alert-overlay').classList.add('hidden');
+                console.log(`CDS Alert acknowledged by ${user}`);
+            }
+        };
+
+        let dataChart = null;
+
+        window.populateChartDropdown = () => {
+            const select = document.getElementById('chart-parameter');
+            if(!select) return;
+            select.innerHTML = '';
+            
+            const optgroupFS = document.createElement('optgroup');
+            optgroupFS.label = 'Flowsheet Items';
+            flowsheetConfig.forEach(cat => {
+                cat.items.forEach(item => {
+                    if (item.type !== 'select') {
+                        const opt = document.createElement('option');
+                        opt.value = item.key;
+                        opt.textContent = `${cat.category} - ${item.label}`;
+                        optgroupFS.appendChild(opt);
+                    }
+                });
+            });
+            select.appendChild(optgroupFS);
+
+            const optgroupLabs = document.createElement('optgroup');
+            optgroupLabs.label = 'Lab Results';
+            labsConfig.forEach(cat => {
+                cat.items.forEach(item => {
+                    if (item.type !== 'select') {
+                        const opt = document.createElement('option');
+                        opt.value = item.key;
+                        opt.textContent = `${cat.category} - ${item.label}`;
+                        optgroupLabs.appendChild(opt);
+                    }
+                });
+            });
+            select.appendChild(optgroupLabs);
+        };
+
+        window.renderChart = () => {
+            if (!currentPatientId) return;
+            const select = document.getElementById('chart-parameter');
+            if (!select || !select.value) return;
+            
+            const parameter = select.value;
+            const label = select.options[select.selectedIndex]?.text || 'Data';
+            
+            document.getElementById('chart-title').textContent = label + ' Historical Trends';
+
+            let chartPoints = [];
+            
+            // Helper to turn clinical text (Trace, Large, <0.1) into graphable numbers
+            function parseClinicalValueForGraph(val) {
+                if (val === undefined || val === null || val === '') return null;
+                const str = String(val).toLowerCase().trim();
+                
+                if (str === 'negative' || str === 'neg') return 0;
+                if (str === 'trace') return 0.5;
+                if (str === 'small' || str === '1+') return 1;
+                if (str === 'moderate' || str === 'mod' || str === '2+') return 2;
+                if (str === 'large' || str === '3+') return 3;
+                if (str === '4+') return 4;
+                
+                const match = str.match(/-?\d+(\.\d+)?/);
+                if (match) return parseFloat(match[0]);
+                return null;
+            }
+
+            const processData = (d, isLab) => {
+                const val = d.data[parameter];
+                const numVal = parseClinicalValueForGraph(val);
+                
+                if (numVal !== null) {
+                    let clinicalTime;
+                    // Use actual entered clinical time for the X-axis, not the system save time
+                    if (isLab) {
+                        clinicalTime = new Date(`${d.date}T${d.time}`);
+                        if (isNaN(clinicalTime.getTime())) clinicalTime = new Date(d.recordedAt);
+                    } else {
+                        let recDate = new Date(d.recordedAt);
+                        let dateStr = recDate.getFullYear() + '-' + String(recDate.getMonth()+1).padStart(2, '0') + '-' + String(recDate.getDate()).padStart(2, '0');
+                        clinicalTime = new Date(`${dateStr}T${d.time}`);
+                        if (isNaN(clinicalTime.getTime())) clinicalTime = recDate;
+                    }
+                    chartPoints.push({ x: clinicalTime, y: numVal, raw: val });
+                }
+            };
+
+            currentFlowsheetData.forEach(d => processData(d, false));
+            currentLabsData.forEach(d => processData(d, true));
+            
+            // Sort chronologically by clinical time
+            chartPoints.sort((a, b) => a.x - b.x);
+
+            const ctx = document.getElementById('dataChart').getContext('2d');
+            if (dataChart) dataChart.destroy();
+            
+            if (chartPoints.length === 0) {
+                document.getElementById('chart-title').textContent = label + ' - No graphable data available';
+                return;
+            }
+            
+            dataChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartPoints.map(p => {
+                        const d = p.x;
+                        return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                    }),
+                    datasets: [{
+                        label: label,
+                        data: chartPoints.map(p => p.y),
+                        borderColor: '#10b981', 
+                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#047857',
+                        pointRadius: 6,
+                        pointHoverRadius: 9,
+                        fill: true,
+                        tension: 0.1 // Straighter lines for clinical accuracy
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { 
+                            ticks: { autoSkip: true, maxTicksLimit: 12 },
+                            grid: { display: false }
+                        },
+                        y: { 
+                            beginAtZero: false,
+                            grid: { color: '#e2e8f0' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleFont: { size: 14 },
+                            bodyFont: { size: 16, weight: 'bold' },
+                            padding: 12,
+                            callbacks: {
+                                label: function(context) {
+                                    // Show the exact text the user typed (e.g., "Large" instead of "3")
+                                    const idx = context.dataIndex;
+                                    return ' Result: ' + chartPoints[idx].raw;
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index',
+                    },
+                }
+            });
+        };
+    </script>
+</body>
+</html>
